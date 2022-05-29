@@ -1,5 +1,6 @@
 ﻿namespace fitz 
 
+(*
 module Native =
     open System
     open System.Runtime.InteropServices
@@ -39,6 +40,8 @@ module ConsoleHelper =
     let useAlternateScreenBuffer = printf "\u001b[?1049h"
     let useMainScreenBuffer = printf "\u001b[?1049l"
 
+    *)
+
 module Fitz = 
 
     [<EntryPointAttribute>]
@@ -50,19 +53,17 @@ module Fitz =
         // if err block...
 
         // parse flags 
-        let results = Args.parser.ParseCommandLine argv
-        let settings, time, changed, err = Args.parseFlags config Version
+        let settings, time = Args.parseFlags config argv
 
         // update config
-        // Um. No. We don't hammer user configs.
+        // Um. Don't hammer user configs.
         // Maybe add a flag or something, but this should not be default behavior.
-        // SKIP
 
         // plot time
-        // maybe add a live check here
+        // add a live check here
         // if live then useAlternateScreenBuffer
         // maybe seperate plot to plotLive 
-        Plot.plot config time 
+        Plot.plotTime settings time
 
         // if live then useMainScreenBuffer
         0

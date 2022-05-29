@@ -5,9 +5,9 @@
     <TargetFramework>net6.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Literals.fs" />
-    <Compile Include="Types.fs" />
-    <Compile Include="Core.fs" />
+    <Compile Include="Literal.fs" />
+    <Compile Include="Type.fs" />
+    <Compile Include="Base.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>

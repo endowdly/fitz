@@ -37,6 +37,15 @@
             "italic": false
         },
         {
+            "tag": "done",
+            "color": "#000000",
+            "strikethrough": true,
+            "underline": false,
+            "backgroundColor": "#ff8c00",
+            "bold": false,
+            "italic": false
+        },
+        {
             "tag": "note",
             "color": "#98C379",
             "strikethrough": false,
