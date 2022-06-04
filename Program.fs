@@ -1,4 +1,4 @@
-﻿namespace fitz 
+﻿namespace fitz
 
 (*
 module Native =
@@ -42,31 +42,60 @@ module ConsoleHelper =
 
     *)
 
-module Fitz = 
+module Fitz =
 
     [<EntryPointAttribute>]
-    let main argv = 
+    let main argv =
 
-        // get configuration 
-        // todo use pattern matching 
-        let config, err = Configuration.load 
+        // get configuration
+        let config, err = Configuration.load
         // if err block...
 
-        // parse flags 
+        // parse flags
         let settings, time = Args.parseFlags config argv
 
         // update config
         // Um. Don't hammer user configs.
         // Maybe add a flag or something, but this should not be default behavior.
+        match Args.canOverwriteConfig argv with
+        | false -> ()
+        | true -> Configuration.save config
 
         // plot time
         // add a live check here
         // if live then useAlternateScreenBuffer
-        // maybe seperate plot to plotLive 
-        Plot.plotTime settings time
+        // maybe seperate plot to plotLive
+        // todo console window adjust event
+        if settings.Live then
+            // turn off the cursor
+            System.Console.CursorVisible <- false
+
+            // time will always be now
+            let s, r = Plot.plotLive settings
+
+            // start the timers
+            s.Enabled <- true
+
+            // set up the app live
+            let mutable quit = false 
+            let stop (s : System.Timers.Timer) (r : System.Timers.Timer) =
+                s.Enabled <- false
+                r.Enabled <- false
+                s.Dispose()
+                r.Dispose()
+                quit <- true
+
+            System.Console.CancelKeyPress.Add(fun _ -> stop s r)
+
+            while not quit do
+                let cki = System.Console.ReadKey(true)
+                if cki.Key = System.ConsoleKey.Q || cki.Key = System.ConsoleKey.Escape then stop s r
+
+            // turn the cursor back on
+            System.Console.CursorVisible <- true
+        else
+            // drop the block and print and leave
+            Plot.getPlot settings time |> Plot.plot
 
         // if live then useMainScreenBuffer
         0
-
-
-        

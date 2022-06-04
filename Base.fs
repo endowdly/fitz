@@ -1,7 +1,11 @@
 namespace fitz
 
+// done todo clean unused functions
+
 module Helper =
     open System
+
+    // todo move helper and xfrm functions here
 
     let rec times (from : DateTime) (toTime : DateTime) =
         seq {
@@ -109,14 +113,6 @@ module Segment =
         Array.iter Cell.print cells
         printf "\n"
 
-    let add cells segment =
-        let head = List.ofArray segment
-        let tail = List.ofArray cells
-
-        head @ tail |> Array.ofList
-
-    let addStr str segment = add (fromString str) segment
-
     let insertCells pos newCells (cells : Cell []) =
         try
             cells[pos .. (pos + (Array.length newCells) - 1)] <- newCells
@@ -150,12 +146,6 @@ module Block =
         [ 0 .. (Array2D.length1 block) - 1 ]
         |> List.map(fun row -> block[row, *])
         |> List.iter(fun row -> Segment.print row)
-
-    // done todo add row
-    let add row ls =
-        match ls with
-        | [] -> [ row ]
-        | _ -> row :: ls
 
     // done todo make from rows
     let fromRows (ls : Cell [] list) =
@@ -501,8 +491,8 @@ module Plot =
         group 2
         group 3
     *)
-    let plotTime (c : Configuration.Config) (t : DateTime) =
-        // let plotTime (t : DateTime) =
+    // done todo () => Block
+    let getPlot (c : Configuration.Config) (t : DateTime) =
         let utc = t.ToUniversalTime()
 
         let style =
@@ -525,12 +515,11 @@ module Plot =
         // this has to generate and check every tick in a second -- we can speed up execution
         // by shrinking the check range or eliminate it by passing a boolean like: plotTime c t b
         // just have Args.parseFlags emit a bool at the end to pass to here
-        // note the longest time will be when an arbitrary time is passed
+        // the longest time will be when an arbitrary time is passed
         // Seq.contains (lazy) bails if it finds a generated match so 'now' execution will be fast
         let markerStr =
             let plusOne = t.AddSeconds(1.0)
             let inTime = Helper.times t plusOne |> Seq.contains DateTime.Now
-
             if inTime then "now" else "time"
 
         let markerStrSeg = Segment.fromString markerStr
@@ -556,46 +545,41 @@ module Plot =
 
         let descriptionLengthPlus2 = descriptionLength + 2
 
-        Segment.print markerSeg
+        // Segment.print markerSeg
 
-        timezones
-        |> List.iter (fun timezone ->
-            let time = formatDateTime c.Hours12 (toTimeZone utc timezone.TimeZone)
+        let timebars =
+            timezones
+            |> List.map (fun tz ->
+                let t = formatDateTime c.Hours12 (toTimeZone utc tz.TimeZone)
+                let sDesc = (tz.Name + ":").PadRight(descriptionLengthPlus2) + t
+                let cDesc = String.length sDesc
+                let xDesc = Segment.fromString sDesc
 
-            let desc =
-                (timezone.Name + ":")
-                    .PadRight(descriptionLengthPlus2)
-                + time
+                let desc =
+                    let s0 = Segment.empty w |> Segment.insertCells 0 xDesc
 
-            let descLen = String.length desc
-            let descCells = Segment.fromString desc
+                    if (cDesc - 1) < nowSlot then
+                        s0
+                        |> Segment.insertCells nowSlot (Segment.fromString Literal.bar)
+                        |> Segment.withStyle(style Normal)
+                    else
+                        s0 |> Segment.withStyle(style Normal)
 
-            let head =
-                let s0 = Segment.empty w |> Segment.insertCells 0 descCells
+                let bar =
+                    Segment.empty w
+                    |> Array.mapi (fun x cell ->
+                        let timeSlot = utc.AddMinutes((float x) * slotMins - offsetMins)
+                        let tzTime = toTimeZone timeSlot tz.TimeZone
 
-                if (descLen - 1) < nowSlot then
-                    s0
-                    |> Segment.insertCells nowSlot (Segment.fromString Literal.bar)
-                    |> Segment.withStyle(style Normal)
-                else
-                    s0 |> Segment.withStyle(style Normal)
+                        { cell with
+                            Char = getHourSymbol c tzTime.Hour
+                            Style = style(getContext c tzTime.Hour) })
+                    |> Segment.insertCells
+                        nowSlot
+                        (Segment.fromString Literal.bar
+                         |> Segment.withStyle(style Normal))
 
-            let tail =
-                Segment.empty w
-                |> Array.mapi (fun x cell ->
-                    let timeSlot = utc.AddMinutes((float x) * slotMins - offsetMins)
-                    let tzTime = toTimeZone timeSlot timezone.TimeZone
-
-                    { cell with
-                        Char = getHourSymbol c tzTime.Hour
-                        Style = style(getContext c tzTime.Hour) })
-                |> Segment.insertCells
-                    nowSlot
-                    (Segment.fromString Literal.bar
-                     |> Segment.withStyle(style Normal))
-
-            // todo need better names for head and tail...
-            [ head; tail ] |> Block.fromRows |> Block.print)
+                [ desc; bar ])
 
 
         // done todo plotTics
@@ -627,25 +611,77 @@ module Plot =
 
         // note wanted to do tics more 'cleverly' but couldn't think of an improvement
 
-        if c.Tics then
-            [ ticLine; Segment.empty w; numberLine ]
-            |> Block.fromRows
-            |> Block.print
-        else
-            ()
+        let rows = markerSeg :: List.concat timebars
 
-    // todo complete
-    let handleLivePlot = ()
+        if c.Tics then
+            [ ticLine
+              Segment.empty w
+              numberLine ]
+            |> List.append rows
+            |> Block.fromRows
+        else
+            rows |> Block.fromRows
+
+    let plot = Block.print
+
+    // done todo write
+    let plotLive c =
+        // Get current good plot
+        let b0 = getPlot c DateTime.Now
+
+        // Get cursor position and set as origin
+        let p0 = Console.GetCursorPosition().ToTuple()
+
+        // Write plot
+        plot b0
+
+        // Get time difference to next minute
+        let t0 = DateTime.Now
+        let dT = 60_000 - (t0.Second * 1_000 + t0.Millisecond)
+        // From here update every minute
+        // Interval is in milliseconds
+        let t = 60_000
+
+        // Setup timer based on time differences
+        let startTimer = new Timers.Timer(dT)
+        let runTimer = new Timers.Timer(t)
+        startTimer.AutoReset <- false
+        runTimer.AutoReset <- true
+
+        // Get new plot on event trigger
+        // Update character in the cell at the position of the difference
+        let dB (b : Cell [,]) =
+            let m = Array2D.length1 b0
+            let n = Array2D.length2 b0
+
+            for r in 0 .. m - 1 do
+                for c in 0 .. n - 1 do
+                    let x = b0[r, c]
+                    let x' = b[r, c]
+
+                    // update our block for future diff
+                    if x <> x' then b0[r, c] <- x'
+
+                    Console.SetCursorPosition(fst p0 + c, snd p0 + r)
+                    Cell.print x'
+
+        // Send event signal on the first signal after a fresh minute
+        startTimer.Elapsed.Add (fun e ->
+            dB(getPlot c DateTime.Now)
+            runTimer.Enabled <- true)
+
+        runTimer.Elapsed.Add(fun e -> dB(getPlot c DateTime.Now))
+
+        // return the timers 
+        startTimer, runTimer
 
 module Args =
 
-    open System
-
-    open Configuration
-
+    open System 
+    open Configuration 
     open Argu
 
-    // todo add flag save
+    // done todo add flag save
     [<CliPrefix(CliPrefix.DoubleDash)>]
     type FitzArguments =
         | Timezones of timezones : string
@@ -657,6 +693,7 @@ module Args =
         | Live
         | [<MainCommand; Unique; First>] Time of TIME : string
         | Version
+        | Save
 
         interface IArgParserTemplate with
             member arg.Usage =
@@ -675,12 +712,12 @@ module Args =
                 | Hours12 -> "use 12-hour clock"
                 | Time _ -> "time to display"
                 | Version -> "print version and exit"
+                | Save -> "save options to configuration"
 
     let parser = ArgumentParser.Create<FitzArguments>(programName = "fitz")
 
-    // idea use active pattern
-    // todo complete
-    let checkTimezoneLocation (tz : string) : bool = false
+    // note gotz checks the incoming string before and after it is loaded as a config type
+    // maybe just let the config logic handle this?
 
     // parseTimeZones parses a comma-seperated list of timezones
     // idea return Result and bind with parseTime
@@ -697,19 +734,19 @@ module Args =
                   | [| name |] -> Some { Name = name.Trim(); TimeZone = name.Trim() }
                   | [| head; tail |] -> Some { Name = head.Trim(); TimeZone = tail.Trim() }
                   | _ -> None ]
+
         |> List.filter(fun loc -> Option.isSome loc)
         |> List.map(fun loc -> Option.get loc)
         |> Array.ofList
 
     // note inputTimeformat and parseTime are wrapped up into System.DateTime.TryParse
-    // note do not reinvent the wheel
     // idea return Result
     let parseTime (s : string) : DateTime =
         match DateTime.TryParse(s) with
         | true, v -> v
         | false, _ -> failwith $"invalid time: {s}"
 
-    // done todo complete
+    // done todo write
     // // idea appSettings/runConfig/runSettings
     let parseFlags (c : Config) (s : string []) : Config * DateTime =
         let results = parser.Parse s
@@ -749,3 +786,8 @@ module Args =
                     c.Hours12
             Live = if results.TryGetResult(Live).IsSome then true else c.Live },
         time
+
+    // done todo write
+    let canOverwriteConfig (s : string []) : bool =
+        let res = parser.Parse s
+        if res.TryGetResult(Save).IsSome then true else false

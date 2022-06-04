@@ -456,3 +456,6 @@ $RECYCLE.BIN/
 # Paket
 .paket/
 paket-files/
+
+# Playgrounds
+playground.fsx

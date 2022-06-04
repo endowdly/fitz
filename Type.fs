@@ -1,35 +1,40 @@
 namespace fitz
 
-type TimeZone = System.TimeZoneInfo
+// todo add summary comments
 
-type Color = System.Drawing.Color
+[<AutoOpen>]
+module Types = 
 
-type Location = { Name : string; TimeZone : TimeZone }
+    type TimeZone = System.TimeZoneInfo
 
-type Attribute =
-    | Bold
-    | Blink
-    | Reverse
-    | Underline
-    | Dim
-    | Italic
-    | Strikethrough
+    type Color = System.Drawing.Color
 
-type Style = { Foreground : Color; Background : Color; Attributes : Attribute list } 
+    type Location = { Name : string; TimeZone : TimeZone }
+
+    type Attribute =
+        | Bold
+        | Blink
+        | Reverse
+        | Underline
+        | Dim
+        | Italic
+        | Strikethrough
+
+    type Style = { Foreground : Color; Background : Color; Attributes : Attribute list } 
  
-type Cell = { Char : char; Style : Style } 
+    type Cell = { Char : char; Style : Style } 
   
-type SgrString = string
+    type SgrString = string
   
-type AnsiCommandString = string
+    type AnsiCommandString = string
   
-type ColorLayer =
-    | Foreground
-    | Background
+    type ColorLayer =
+        | Foreground
+        | Background
 
-type Context =
-    | Normal
-    | Morning
-    | Day
-    | Evening
-    | Night
+    type Context =
+        | Normal
+        | Morning
+        | Day
+        | Evening
+        | Night
