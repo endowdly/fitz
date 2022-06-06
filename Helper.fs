@@ -54,8 +54,8 @@ module Helper =
             t
 
 module ConsoleHelper =
-    let useAlternateScreenBuffer = printf "\u001b[?1049h"
-    let useMainScreenBuffer = printf "\u001b[?1049l"
+    let useAlternateScreenBuffer() = printf "\u001b[?1049h"
+    let useMainScreenBuffer() = printf "\u001b[?1049l"
 
 (*
 module Native =

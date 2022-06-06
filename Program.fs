@@ -186,7 +186,7 @@ module Fitz =
         if settings.Live then
             let mutable quit = false 
 
-            ConsoleHelper.useAlternateScreenBuffer
+            ConsoleHelper.useAlternateScreenBuffer()
             Console.Clear()
             Console.SetCursorPosition(0, 2) 
             Console.CursorVisible <- false
@@ -203,7 +203,7 @@ module Fitz =
                 if cki.Key = ConsoleKey.Q || cki.Key = ConsoleKey.Escape then stop()
 
             Console.CursorVisible <- true
-            ConsoleHelper.useMainScreenBuffer
+            ConsoleHelper.useMainScreenBuffer()
         else
             Plot.getPlot settings time |> Plot.plot
 
