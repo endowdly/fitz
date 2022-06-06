@@ -5,9 +5,13 @@
     <TargetFramework>net6.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Literal.fs" />
-    <Compile Include="Type.fs" />
-    <Compile Include="Base.fs" />
+    <Compile Include="GroundTypes.fs" /> 
+    <Compile Include="Helper.fs" /> 
+    <Compile Include="Standard.fs" /> 
+
+    <Compile Include="Configuration.fs" /> 
+    <Compile Include="Plot.fs" /> 
+
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>
