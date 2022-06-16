@@ -39,18 +39,18 @@ module Args =
                 | Version -> "print version and exit"
                 | Save -> "save options to configuration"
 
-    let parser = ArgumentParser.Create<FitzArguments>(programName = "fitz") 
+    let parser = ArgumentParser.Create<FitzArguments>(programName = "fitz")
 
     // parseTimeZones parses a comma-seperated list of timezones
     let parseTimeZones (s : string) =
         [ for ss in s.Split(",") ->
-            if String.IsNullOrWhiteSpace(ss) then 
-                None
-            else
-                match ss.Split(":") with
-                | [| name |] -> Some { Name = name.Trim(); TimeZone = name.Trim() }
-                | [| head; tail |] -> Some { Name = head.Trim(); TimeZone = tail.Trim() }
-                | _ -> None ]
+              if String.IsNullOrWhiteSpace(ss) then
+                  None
+              else
+                  match ss.Split(":") with
+                  | [| name |] -> Some { Name = name.Trim(); TimeZone = name.Trim() }
+                  | [| head; tail |] -> Some { Name = head.Trim(); TimeZone = tail.Trim() }
+                  | _ -> None ]
         |> List.filter(fun loc -> Option.isSome loc)
         |> List.map(fun loc -> Option.get loc)
         |> Array.ofList
@@ -59,7 +59,9 @@ module Args =
     let parseTime (s : string) : DateTime =
         match DateTime.TryParse(s) with
         | true, v -> v
-        | false, _ -> failwith $"invalid time: {s}"
+        | false, _ ->
+            eprintfn $"Cannot parse time: {s} -- fallback to Now"
+            DateTime.Now
 
     let parseFlags (c : Config) (s : string []) : Config * DateTime =
         let results = parser.Parse s
@@ -136,8 +138,30 @@ type ConsoleWindowWatcher() =
 
 module Fitz =
 
+    open System.Reflection
+
     [<Literal>]
-    let Version = "0.0.1"
+    let Version = "0.1.0"
+
+    // Reflection sucks and I hate it
+    // But, I want this to be as proper as I can make it
+
+    let private castAs<'a when 'a : null> (o : obj) =
+        match o with
+        | :? 'a as res -> res
+        | _ -> null
+
+    let private version =
+        let o =
+            Assembly
+                .GetCallingAssembly()
+                .GetCustomAttributes(typeof<AssemblyInformationalVersionAttribute>, false)
+
+        let ax = castAs<AssemblyInformationalVersionAttribute []> o
+
+        match Array.tryHead ax with
+        | Some v -> v.InformationalVersion
+        | None -> Version
 
     let plotLive c =
         let p0 = Console.GetCursorPosition().ToTuple()
@@ -145,7 +169,8 @@ module Fitz =
         let dT = 60_000 - (t0.Second * 1_000 + t0.Millisecond)
         let startTimer = new Timer(dT)
         let timer = new Timer(60_000)
-        let watcher = new ConsoleWindowWatcher() 
+        let watcher = new ConsoleWindowWatcher()
+
         let update () =
             Console.SetCursorPosition(p0)
             Plot.getPlot c DateTime.Now |> Plot.plot
@@ -174,14 +199,28 @@ module Fitz =
     [<EntryPointAttribute>]
     let main argv =
 
+        // Handle our flags and check for help early
+        // Argu handles --help as an error, so catch it here
+        try
+            Args.parser.Parse argv |> ignore
+        with
+        | :? Argu.ArguParseException as ex ->
+            printfn $"{ex.Message}"
+            Environment.Exit(1)
+        | ex ->
+            printfn "ERROR:"
+            printfn $"{ex.Message}"
+            Environment.Exit(2)
+
         if Args.isVersionFlag argv then
-            printfn $"{Version}" // todo make a nicer string?
+            printfn $"fitz {version}"
             Environment.Exit(0)
 
-        // get configuration
+        // Note on Results
+        // Normally I would return Result types and feature ROP here.
+        // However, the domain is small, local, and should be very resilient.
+        // Because we always have a default value available, we should never need an Error.
         let cfg = Configuration.load
-
-        // parse flags
         let settings, time = Args.parseFlags cfg argv
 
         // Um. Don't hammer user configs

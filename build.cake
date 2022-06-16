@@ -1,4 +1,4 @@
-#tool "dotnet:?package=GitVersion.Tool&global" 
+#tool dotnet:?package=GitVersion.Tool&global&version=5.10.3
 #addin nuget:?package=Cake.Git&version=2.0.0
 
 // Statics
