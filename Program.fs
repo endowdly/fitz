@@ -33,7 +33,7 @@ module Args =
                 | Tics -> "use local time tics on the time axis"
                 | Stretch -> "stretch across the terminal at the cost of accuracy"
                 | Colorize -> "colorize the symbols"
-                | Live -> "display time live (quit via 'q' or 'cfg-cfg'"
+                | Live -> "display time live (quit via 'q' or 'C-c'"
                 | Hours12 -> "use 12-hour clock"
                 | Time _ -> "time to display"
                 | Version -> "print version and exit"
