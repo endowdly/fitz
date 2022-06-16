@@ -30,7 +30,7 @@ module GroundTypes =
         | Italic
         | Strikethrough
 
-    /// A compound type to hold all the SGR attributes
+    /// A record to hold all the SGR attributes
     type Style =
         { Foreground : Color option
           Background : Color option

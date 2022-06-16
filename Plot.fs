@@ -2,20 +2,38 @@ namespace fitz
 
 open System 
 
-module Plot =
-
+module Plot = 
     open Configuration
     open Helper
 
+    [<Literal>]
     let SymbolRectanglesDay = '█'
+
+    [<Literal>]
     let SymbolRectanglesTwilight = '▒'
+
+    [<Literal>]
     let SymbolRectanglesNight = ' '
+
+    [<Literal>]
     let SymbolMono = '#'
+
+    [<Literal>]
     let SymbolBork = '!' 
+
+    [<Literal>]
     let CharBar = '|'
+
+    [<Literal>]
     let CharCaret = '^'
+
+    [<Literal>]
     let SymbolSunMoonTwilight = '☼'
+
+    [<Literal>]
     let SymbolSunMoonDay = '☀' 
+
+    [<Literal>]
     let SymbolSunMoonNight = '☾' 
 
     let configLocationToLocation x : Location = { Name = x.Name; TimeZone = tryGetTimeZone x.TimeZone } 
@@ -104,13 +122,11 @@ module Plot =
         let utc = t.ToUniversalTime() 
         let styleNormal = normalStyle cfg
         let style = 
-            match cfg.Style.Colorize with
-            | false -> (fun _ -> styleNormal)
-            | true -> getStyle cfg
+            if cfg.Style.Colorize then getStyle cfg else (fun _ -> styleNormal)
 
         let w =
             if cfg.Stretch then
-                Console.WindowWidth
+                Console.WindowWidth - 1
             else 
                 Console.WindowWidth * 13 / 21 // approx golden ratio
 
@@ -119,7 +135,7 @@ module Plot =
         let minOffset = minPerSlot * w / 2
         let timeSlot = [| for t in 0 .. w -> utc.AddMinutes(float <| t * minPerSlot - minOffset) |]
 
-        // note determining this programmatically can take a bit of time
+        // Note determining this programmatically can take a bit of time:
         // this has to generate and check every tick in a second -- we can speed up execution
         // by shrinking the check range or eliminate it by passing a boolean like: plotTime c t b
         // just have Args.parseFlags emit a bool at the end to pass to here
@@ -127,7 +143,7 @@ module Plot =
         // Seq.contains (lazy) bails if it finds a generated match so 'now' execution will be fast
         let markerStr =
             let plusOne = t.AddSeconds(1.0)
-            let inTime = times t plusOne |> Seq.contains DateTime.Now
+            let inTime = tickGen t plusOne |> Seq.contains DateTime.Now
             if inTime then "now" else "time"
 
         let markerStrSeg = Segment.fromString markerStr
@@ -213,7 +229,7 @@ module Plot =
             ticLine[pos] <- tic
             Segment.insertCellsInPlace pos hourCell numberLine) 
 
-        // note wanted to do tics more 'cleverly' but couldn't think of an improvement
+        // Note wanted to do tics more 'cleverly' but couldn't think of an improvement
 
         let rows = markerSeg :: List.concat timebars
 

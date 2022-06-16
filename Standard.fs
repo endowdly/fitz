@@ -1,39 +1,36 @@
 namespace fitz
 
-open System 
+open System
 open Helper
 
-module Style = 
+module Style =
 
     // Note SGR: select graphic rendition parameters
     // Link -> https://en.wikipedia.org/wiki/ANSI_escape_code#SGR_(Select_Graphic_Rendition)_parameters
-    
+
     [<Literal>]
     let AnsiCommand = "\u001b["
 
     [<Literal>]
-    let AnsiReset = "\u001b[0m" 
- 
+    let AnsiReset = "\u001b[0m"
+
     /// An alias for a string
     type SgrString = string
-  
+
     /// An alias for a string
-    type AnsiCommandString = string 
+    type AnsiCommandString = string
 
     /// A simple type to distinguish SGR layers
-    type ColorLayer = 
+    type ColorLayer =
         | Foreground
         | Background
 
-    let empty =
-        { Foreground = None
-          Background = None
-          Attributes = [] }
-
+    let empty = { Foreground = None; Background = None; Attributes = [] }
     let withForeground color style = { style with Foreground = color }
     let withBackground color style = { style with Background = color }
     let normal style = { style with Attributes = [] }
-    let addAttribute attr style = { style with Attributes = attr :: style.Attributes } 
+    let addAttribute attr style = { style with Attributes = attr :: style.Attributes }
+
     let colorSgrFromRgb layer (r, g, b) : SgrString =
         match layer with
         | Foreground -> $"38;2;{r};{g};{b}"
@@ -43,7 +40,8 @@ module Style =
     let fgSgrFromRgb = colorSgrFromRgb Foreground
     let bgSgrFromRgb = colorSgrFromRgb Background
     let fgSgrFromColor = rgbFromColor >> fgSgrFromRgb
-    let bgSgrFromColor = rgbFromColor >> bgSgrFromRgb 
+    let bgSgrFromColor = rgbFromColor >> bgSgrFromRgb
+
     let sgrFromAttr =
         function
         | Bold -> "1"
@@ -59,14 +57,16 @@ module Style =
             match style.Foreground with
             | Some color -> fgSgrFromColor color
             | None -> "39"
-        let bg = 
-            match style.Background with 
+
+        let bg =
+            match style.Background with
             | Some color -> bgSgrFromColor color
             | None -> "49"
+
         let attrs =
             style.Attributes
             |> List.map sgrFromAttr
-            |> String.concat ";" 
+            |> String.concat ";"
 
         [ fg; bg; attrs ]
 
@@ -74,16 +74,17 @@ module Style =
     let csFromStyle = sgrFromStyle >> csFromSgr
     let reset = printf $"{AnsiReset}"
 
-module Cell = 
-    let make char style = { Char = char; Style = style } 
+module Cell =
+    let make char style = { Char = char; Style = style }
     let empty = make ' ' Style.empty
     let withStyle style cell = { cell with Style = style }
     let print cell = printf $"{Style.csFromStyle cell.Style}{cell.Char}{Style.AnsiReset}"
 
-module Segment = 
+module Segment =
     let make n cell = Array.create n cell
     let empty n = make n Cell.empty
-    let withStyle style cells = Array.map (Cell.withStyle style) cells 
+    let withStyle style cells = Array.map (Cell.withStyle style) cells
+
     let fromString s =
         s
         |> Seq.toArray
@@ -104,7 +105,7 @@ module Segment =
         try
             cells[pos .. (pos + (Array.length newCells) - 1)] <- newCells
         with
-        | _ -> () 
+        | _ -> ()
 
     let centered str n =
         let insert = fromString str
@@ -113,22 +114,21 @@ module Segment =
 
         insertCells pos insert into
 
-module Block = 
-    let make m n = Array2D.create m n Cell.empty 
-    let withStyle style block = Array2D.map (fun cell -> Cell.withStyle style cell) block 
+module Block =
+    let make m n = Array2D.create m n Cell.empty
+    let withStyle style block = Array2D.map (fun cell -> Cell.withStyle style cell) block
+
     let print block =
         [ 0 .. (Array2D.length1 block) - 1 ]
         |> List.map(fun row -> block[row, *])
         |> List.iter(fun row -> Segment.print row)
 
-    let fromRows (ls : Cell [] list) = 
+    let fromRows (ls : Cell [] list) =
         let m = List.length ls
         let n = List.maxBy (fun row -> Array.length row) ls |> Array.length
         let block = make m n
 
         [ 0 .. m - 1 ]
-        |> List.iter (fun row ->
-            block[row, *] <- Segment.insertCells 0 ls[row] block[row, *])
+        |> List.iter(fun row -> block[row, *] <- Segment.insertCells 0 ls[row] block[row, *])
 
         block
-

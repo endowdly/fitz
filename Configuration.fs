@@ -4,8 +4,7 @@ open System
 open System.IO
 open System.Text
 
-module Configuration =
-
+module Configuration = 
     open FSharp.Json
 
     [<Literal>]
@@ -125,7 +124,7 @@ module Configuration =
 
     let defaultConfigFile =
         try
-            // note on the difference between known folder calls
+            // Note on the difference between known folder calls:
             // in go, the xdg package adds the config to LocalAppData for Win and xdg_config_home for unix
             // in .net core, to link to xdg_config_home, use ApplicationData
             // ApplicationData also links to AppData/Roaming, which is the correct heirarchy for
@@ -161,8 +160,6 @@ module Configuration =
 
     let saveDefault () = save defaultConfig
 
-    // todo better error handling
-    // idea return result<config, ex>
     let load =
 
         // If no configuration file exists, create one
@@ -178,14 +175,14 @@ module Configuration =
             | Config data ->
                 // Check version and validate in place
                 if data.ConfigVersion = ConfigVersion then
-                    data, false
+                    data
                 else
-                    defaultConfig, true
+                    defaultConfig
 
             | ConfigFail _ ->
                 eprintfn "Could not deserialize config, using default"
-                defaultConfig, true
+                defaultConfig
 
         | AccessDenied ->
             eprintfn "Could not load config file, using default"
-            defaultConfig, true
+            defaultConfig
