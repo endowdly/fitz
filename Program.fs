@@ -33,7 +33,7 @@ module Args =
                 | Tics -> "use local time tics on the time axis"
                 | Stretch -> "stretch across the terminal at the cost of accuracy"
                 | Colorize -> "colorize the symbols"
-                | Live -> "display time live (quit via 'q' or 'c-c'"
+                | Live -> "display time live (quit via 'q' or 'cfg-cfg'"
                 | Hours12 -> "use 12-hour clock"
                 | Time _ -> "time to display"
                 | Version -> "print version and exit"
@@ -60,10 +60,10 @@ module Args =
         match DateTime.TryParse(s) with
         | true, v -> v
         | false, _ ->
-            eprintfn $"Cannot parse time: {s} -- fallback to Now"
+            eprintfn $"ERROR: Cannot parse time: {s} -- fallback to Now"
             DateTime.Now
 
-    let parseFlags (c : Config) (s : string []) : Config * DateTime =
+    let parseFlags (cfg : Config) (s : string []) : Config * DateTime =
         let results = parser.Parse s
 
         let time =
@@ -73,33 +73,33 @@ module Args =
                 parseTime(results.GetResult(Time, defaultValue = ""))
 
         let style =
-            { c.Style with
+            { cfg.Style with
                 Colorize =
                     if results.TryGetResult(Colorize).IsSome then
                         true
                     else
-                        c.Style.Colorize
-                Symbols = results.GetResult(Symbols, defaultValue = c.Style.Symbols) }
+                        cfg.Style.Colorize
+                Symbols = results.GetResult(Symbols, defaultValue = cfg.Style.Symbols) }
 
-        { c with
+        { cfg with
             Style = style
             TimeZones =
                 if results.TryGetResult(Timezones).IsNone then
-                    c.TimeZones
+                    cfg.TimeZones
                 else
                     parseTimeZones(results.GetResult(Timezones, defaultValue = ""))
-            Tics = if results.TryGetResult(Tics).IsSome then true else c.Tics
+            Tics = if results.TryGetResult(Tics).IsSome then true else cfg.Tics
             Stretch =
                 if results.TryGetResult(Stretch).IsSome then
                     true
                 else
-                    c.Stretch
+                    cfg.Stretch
             Hours12 =
                 if results.TryGetResult(Hours12).IsSome then
                     true
                 else
-                    c.Hours12
-            Live = if results.TryGetResult(Live).IsSome then true else c.Live },
+                    cfg.Hours12
+            Live = if results.TryGetResult(Live).IsSome then true else cfg.Live },
         time
 
     let canOverwriteConfig (s : string []) : bool =
@@ -144,8 +144,6 @@ module Fitz =
     let Version = "0.1.0"
 
     // Reflection sucks and I hate it
-    // But, I want this to be as proper as I can make it
-
     let private castAs<'a when 'a : null> (o : obj) =
         match o with
         | :? 'a as res -> res
@@ -163,7 +161,7 @@ module Fitz =
         | Some v -> v.InformationalVersion
         | None -> Version
 
-    let plotLive c =
+    let plotLive cfg =
         let p0 = Console.GetCursorPosition().ToTuple()
         let t0 = DateTime.Now
         let dT = 60_000 - (t0.Second * 1_000 + t0.Millisecond)
@@ -173,7 +171,7 @@ module Fitz =
 
         let update () =
             Console.SetCursorPosition(p0)
-            Plot.getPlot c DateTime.Now |> Plot.plot
+            Plot.getPlot cfg DateTime.Now |> Plot.plot
 
         watcher.WindowChangedEvent.Add (fun _ ->
             Console.Clear()
@@ -208,8 +206,8 @@ module Fitz =
             printfn $"{ex.Message}"
             Environment.Exit(1)
         | ex ->
-            printfn "ERROR:"
-            printfn $"{ex.Message}"
+            eprintfn "ERROR:"
+            eprintfn $"{ex.Message}"
             Environment.Exit(2)
 
         if Args.isVersionFlag argv then

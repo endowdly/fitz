@@ -21,7 +21,7 @@ module Helper =
             TimeZoneInfo.FindSystemTimeZoneById(s)
         with
         | _ ->
-            eprintfn $"Could not find timezone '{s}, defaulting to system timezone"
+            eprintfn $"ERROR: Could not find timezone '{s} -- fallback to system timezone"
             TimeZone.Local
 
     /// Tries to find a color by string or hex code. On failure, returns None.
@@ -33,7 +33,7 @@ module Helper =
                 Some <| ColorTranslator.FromHtml(s)
             with
             | _ ->
-                eprintfn $"{s} is not a known color or html hex color, using default color"
+                eprintfn $"ERROR: {s} is not a known color or html hex color -- fallback to default color"
                 None
 
     /// Formats time in a custom way.
@@ -54,7 +54,8 @@ module Helper =
             TimeZoneInfo.ConvertTimeFromUtc(t, tz)
         with
         | _ ->
-            eprintfn $"Could not convert to {tz.ToString()}, using input"
+            eprintfn $"ERROR: Could not convert to {tz.ToString()} -- fallback to input"
+            eprintfn "This error should never been seen! Please report -> https://github.com/endowdly/fitz/issues"
             t
 
 module ConsoleHelper =
