@@ -1,4 +1,4 @@
-#tool "dotnet:?package=GitVersion.Tool&global" 
+#tool dotnet:?package=GitVersion.Tool&global&version=5.10.3
 #addin nuget:?package=Cake.Git&version=2.0.0
 
 // Statics
@@ -49,16 +49,18 @@ Task("Build")
 Task("TestVersion")
     .Does(() =>
     {
-        var tags = GitTags("."); 
+        var tags = GitTags(".");
         var taggedVersion = tags.Any()
-            ? tags.Last().ToString()
+            ? tags.Last().FriendlyName.Trim()
             : "<no tags>";
 
         Information($"Calculated Version: {version}");
         Information($"Tagged Version: {taggedVersion}");
 
-        if (version.Equals(assmVersion))
-            throw new ArgumentException("Cannot release the current version"); 
+        if (version.Trim() != taggedVersion.Trim()) 
+            throw new ArgumentException("Tags must match!"); 
+
+        Information("Versions match!");
     });
 
 Task("Clean") 
@@ -67,7 +69,7 @@ Task("Clean")
         var binDir = "./bin";
         var objDir = "./obj";
 
-        Information($"Cleaning projects dir..."); 
+        Information($"Cleaning projects dirs..."); 
 
         if (DirectoryExists(binDir))
             CleanDirectory(binDir);
@@ -132,64 +134,52 @@ Task("Publish")
 
 Task("Release")
     .IsDependentOn("Publish")
-    .IsDependentOn("TestVersion")
-    .Does(() => {
-
-        static bool excludeDebugs(IFileSystemInfo f) => 
+    .Does(() => 
+    { 
+        static bool filterDebugFiles(IFileSystemInfo f) => 
             !f.Path.FullPath.EndsWith("pdb");
 
-        var globSettings = new GlobberSettings
-        { 
-            Predicate = excludeDebugs,
-        };
-        var fs = GetFiles($"{buildDir}/**/fitz", globSettings);
-
+        var fs = GetFiles($"{buildDir}/**/fitz*", new GlobberSettings { FilePredicate = filterDebugFiles }); 
         var args = new ProcessArgumentBuilder()
             .Append("release")
             .Append("create")
-            .Append(tag)
-            .Append("--target")
-            .Append("main")
-            .Append("--title")
-            .Append($"Release {tag}"); 
+            .AppendQuoted(tag)
+            .AppendSwitch("--target", "main")
+            .AppendSwitchQuoted("--title", $"Release {tag}");
 
         if (!string.IsNullOrEmpty(notes))
             args
-                .Append("--notes")
-                .Append(notes);
+                .AppendSwitchQuoted("--notes", notes);
 
         foreach (var f in fs)
         {
-            args.Append(f.FullPath);
+            var dir = f.GetDirectory();
+            var path = f.GetFilenameWithoutExtension().ToString();
+            var ext = f.GetExtension();
+            var sNewFile = $"{dir.GetDirectoryName()}-{path}{ext}".TrimEnd();
+            var newFile = new FilePath(sNewFile); 
+            var absNewFile = newFile.MakeAbsolute(dir);
+
+            Information($"Release {f} as {absNewFile.GetFilename()}");
+            MoveFile(f.FullPath, absNewFile.FullPath);
+
+            args.AppendQuoted(absNewFile.FullPath);
         } 
-
-        var process = new FilePath("gh.exe"); 
-        var pathDirs = EnvironmentVariable("PATH").Split(";"); 
-
-        foreach (var path in pathDirs)
-        {
-            var temp = GetFiles($"{path}/**/{process.ToString()}");
-
-            if (temp.Any())
-            {
-                process = temp.First();
-                break;
-            } 
-        }
-
         var settings = new ProcessSettings
         {
             Arguments = args, 
-        };
+        }; 
 
-        StartProcess(process, settings); 
-    });
+        Debug("running 'gh' with arguments:");
+        Debug(args.Render());
+
+        var returnCode = StartProcess("gh", settings); 
+        
+        Information($"'gh release' exited with code {returnCode}");
+    }); 
 
 Task("Default")
-    .Does(() =>
-    {
-        RunTarget("Clean");
-        RunTarget("TestVersion");
-    });
+    .IsDependentOn("Clean")
+    .IsDependentOn("TestVersion");
 
 RunTarget(target);

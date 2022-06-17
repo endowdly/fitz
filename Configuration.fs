@@ -180,9 +180,9 @@ module Configuration =
                     defaultConfig
 
             | ConfigFail _ ->
-                eprintfn "Could not deserialize config, using default"
+                eprintfn "ERROR: Could not deserialize config -- fallback to default config"
                 defaultConfig
 
         | AccessDenied ->
-            eprintfn "Could not load config file, using default"
+            eprintfn "ERROR: Could not load config file -- fallback to default config"
             defaultConfig

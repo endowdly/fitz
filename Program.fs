@@ -33,24 +33,24 @@ module Args =
                 | Tics -> "use local time tics on the time axis"
                 | Stretch -> "stretch across the terminal at the cost of accuracy"
                 | Colorize -> "colorize the symbols"
-                | Live -> "display time live (quit via 'q' or 'c-c'"
+                | Live -> "display time live (quit via 'q' or 'C-c'"
                 | Hours12 -> "use 12-hour clock"
                 | Time _ -> "time to display"
                 | Version -> "print version and exit"
                 | Save -> "save options to configuration"
 
-    let parser = ArgumentParser.Create<FitzArguments>(programName = "fitz") 
+    let parser = ArgumentParser.Create<FitzArguments>(programName = "fitz")
 
     // parseTimeZones parses a comma-seperated list of timezones
     let parseTimeZones (s : string) =
         [ for ss in s.Split(",") ->
-            if String.IsNullOrWhiteSpace(ss) then 
-                None
-            else
-                match ss.Split(":") with
-                | [| name |] -> Some { Name = name.Trim(); TimeZone = name.Trim() }
-                | [| head; tail |] -> Some { Name = head.Trim(); TimeZone = tail.Trim() }
-                | _ -> None ]
+              if String.IsNullOrWhiteSpace(ss) then
+                  None
+              else
+                  match ss.Split(":") with
+                  | [| name |] -> Some { Name = name.Trim(); TimeZone = name.Trim() }
+                  | [| head; tail |] -> Some { Name = head.Trim(); TimeZone = tail.Trim() }
+                  | _ -> None ]
         |> List.filter(fun loc -> Option.isSome loc)
         |> List.map(fun loc -> Option.get loc)
         |> Array.ofList
@@ -59,9 +59,11 @@ module Args =
     let parseTime (s : string) : DateTime =
         match DateTime.TryParse(s) with
         | true, v -> v
-        | false, _ -> failwith $"invalid time: {s}"
+        | false, _ ->
+            eprintfn $"ERROR: Cannot parse time: {s} -- fallback to Now"
+            DateTime.Now
 
-    let parseFlags (c : Config) (s : string []) : Config * DateTime =
+    let parseFlags (cfg : Config) (s : string []) : Config * DateTime =
         let results = parser.Parse s
 
         let time =
@@ -71,33 +73,33 @@ module Args =
                 parseTime(results.GetResult(Time, defaultValue = ""))
 
         let style =
-            { c.Style with
+            { cfg.Style with
                 Colorize =
                     if results.TryGetResult(Colorize).IsSome then
                         true
                     else
-                        c.Style.Colorize
-                Symbols = results.GetResult(Symbols, defaultValue = c.Style.Symbols) }
+                        cfg.Style.Colorize
+                Symbols = results.GetResult(Symbols, defaultValue = cfg.Style.Symbols) }
 
-        { c with
+        { cfg with
             Style = style
             TimeZones =
                 if results.TryGetResult(Timezones).IsNone then
-                    c.TimeZones
+                    cfg.TimeZones
                 else
                     parseTimeZones(results.GetResult(Timezones, defaultValue = ""))
-            Tics = if results.TryGetResult(Tics).IsSome then true else c.Tics
+            Tics = if results.TryGetResult(Tics).IsSome then true else cfg.Tics
             Stretch =
                 if results.TryGetResult(Stretch).IsSome then
                     true
                 else
-                    c.Stretch
+                    cfg.Stretch
             Hours12 =
                 if results.TryGetResult(Hours12).IsSome then
                     true
                 else
-                    c.Hours12
-            Live = if results.TryGetResult(Live).IsSome then true else c.Live },
+                    cfg.Hours12
+            Live = if results.TryGetResult(Live).IsSome then true else cfg.Live },
         time
 
     let canOverwriteConfig (s : string []) : bool =
@@ -136,19 +138,40 @@ type ConsoleWindowWatcher() =
 
 module Fitz =
 
-    [<Literal>]
-    let Version = "0.0.1"
+    open System.Reflection
 
-    let plotLive c =
+    [<Literal>]
+    let Version = "0.1.0"
+
+    // Reflection sucks and I hate it
+    let private castAs<'a when 'a : null> (o : obj) =
+        match o with
+        | :? 'a as res -> res
+        | _ -> null
+
+    let private version =
+        let o =
+            Assembly
+                .GetCallingAssembly()
+                .GetCustomAttributes(typeof<AssemblyInformationalVersionAttribute>, false)
+
+        let ax = castAs<AssemblyInformationalVersionAttribute []> o
+
+        match Array.tryHead ax with
+        | Some v -> v.InformationalVersion
+        | None -> Version
+
+    let plotLive cfg =
         let p0 = Console.GetCursorPosition().ToTuple()
         let t0 = DateTime.Now
         let dT = 60_000 - (t0.Second * 1_000 + t0.Millisecond)
         let startTimer = new Timer(dT)
         let timer = new Timer(60_000)
-        let watcher = new ConsoleWindowWatcher() 
+        let watcher = new ConsoleWindowWatcher()
+
         let update () =
             Console.SetCursorPosition(p0)
-            Plot.getPlot c DateTime.Now |> Plot.plot
+            Plot.getPlot cfg DateTime.Now |> Plot.plot
 
         watcher.WindowChangedEvent.Add (fun _ ->
             Console.Clear()
@@ -174,14 +197,28 @@ module Fitz =
     [<EntryPointAttribute>]
     let main argv =
 
+        // Handle our flags and check for help early
+        // Argu handles --help as an error, so catch it here
+        try
+            Args.parser.Parse argv |> ignore
+        with
+        | :? Argu.ArguParseException as ex ->
+            printfn $"{ex.Message}"
+            Environment.Exit(1)
+        | ex ->
+            eprintfn "ERROR:"
+            eprintfn $"{ex.Message}"
+            Environment.Exit(2)
+
         if Args.isVersionFlag argv then
-            printfn $"{Version}" // todo make a nicer string?
+            printfn $"fitz {version}"
             Environment.Exit(0)
 
-        // get configuration
+        // Note on Results
+        // Normally I would return Result types and feature ROP here.
+        // However, the domain is small, local, and should be very resilient.
+        // Because we always have a default value available, we should never need an Error.
         let cfg = Configuration.load
-
-        // parse flags
         let settings, time = Args.parseFlags cfg argv
 
         // Um. Don't hammer user configs
