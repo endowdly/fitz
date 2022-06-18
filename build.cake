@@ -11,7 +11,7 @@ const string AssmVersion = "0.0.1";  // This should not be changed often
 // These will largely remain the same as gotz
 // To be specific, these are runtime id's
 // link -> https://docs.microsoft.com/en-us/dotnet/core/rid-catalog
-readonly string[] _platform = { "linux-x64", "linux-arm64", "osx-x64", "win10-x86", "win-arm64" };
+readonly string[] platforms = { "linux-x64", "linux-arm64", "osx-x64", "win10-x86", "win-arm64" };
 
 // Lazy, so let GitVersion do versioning
 readonly string _version = GitVersion().FullSemVer;
@@ -23,28 +23,60 @@ readonly string _version = GitVersion().FullSemVer;
 
 var target = Argument("target", "Default");
 var configuration = Argument("configuration", Configuration);
-var version = Argument("version", _version);
+var version = Argument("fitz-version", _version);
 var assmVersion = Argument("assembly-version", AssmVersion);
 var buildDir = Argument("output", "./publish");
 var tag = Argument("tag", version);
 var notes = Argument("notes", "");
+var apiKey = Argument("api-key", "");
 
 ///////////////////////////////////////////////////////////////////////////////
 // TASKS
 ///////////////////////////////////////////////////////////////////////////////
+DotNetMSBuildSettings msBuildSettings;
+DirectoryPath nupkgDir;
 
-Task("Build") 
+Setup(ctx =>
+{
+    msBuildSettings = new DotNetMSBuildSettings
+    {
+        AssemblyVersion = assmVersion,
+        FileVersion = assmVersion,
+        InformationalVersion = version,
+    }
+        .WithProperty("Version", version); 
+});
+
+Task("Pack") 
     .IsDependentOn("Clean")
-    .Does(() => 
+    .Does(() =>
     { 
-        var settings = new DotNetBuildSettings
+        var settings = new DotNetPackSettings
         {
             NoLogo = true,
-            Verbosity = DotNetVerbosity.Minimal, 
-        };
-
-        DotNetBuild(Project, settings);
+            Verbosity = DotNetVerbosity.Minimal,
+            Configuration = Configuration,
+            MSBuildSettings = msBuildSettings
+                .WithProperty("PackAsTool", true.ToString())
+                .WithProperty("ToolCommandName", "fitz")
+                .WithProperty("PackageOutputPath", "./nupkg")
+        }; 
+        DotNetPack(Project, settings); 
     });
+
+Task("Push")
+    .IsDependentOn("Pack")
+    .Does(() => 
+    {
+        if (string.IsNullOrWhiteSpace(apiKey))
+            throw new ArgumentNullException(nameof(apiKey)); 
+
+        var packageFilePath = GetFiles("./nupkg/*.nupkg").Single();
+
+        Information($"Pushing {packageFilePath}"); 
+        DotNetNuGetPush(packageFilePath,
+            new DotNetNuGetPushSettings { ApiKey = apiKey, Source = "https://api.nuget.org/v3/index.json" });
+    }); 
 
 Task("TestVersion")
     .Does(() =>
@@ -99,17 +131,8 @@ Task("Publish")
         {
             { EnvGlobInv, envGlobInv.ToString() }
         }; 
-        var properties = new Dictionary<string, string>
-        {
-            { "PublishSingleFile", true.ToString() }, 
-        };
-        var msBuildSettings = new DotNetMSBuildSettings
-        {
-            AssemblyVersion = AssmVersion,
-            FileVersion = AssmVersion,
-            InformationalVersion = version,
-        }; 
-        var publishSettings = _platform
+
+        var publishSettings = platforms
             .Select(runtime => 
                 new DotNetPublishSettings()
                 {

@@ -459,3 +459,5 @@ paket-files/
 
 # Playgrounds
 playground.fsx 
+
+nupkg/

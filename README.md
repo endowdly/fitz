@@ -15,8 +15,9 @@ scoop install fitz
 
 ### Directly via [dotnet](https://docs.microsoft.com/en-us/dotnet/core/tools/global-tools)
  
-[_NotImplementedException_](https://docs.microsoft.com/en-us/dotnet/api/system.notimplementedexception?view=net-6.0)
-(Coming soon).
+```powershell
+dotnet tool install --global Endowdly.Fitz --version 0.1.0 
+```
 
 ### Binary 
 

@@ -1,6 +1,9 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <PackageId>Endowdly.Fitz</PackageId>
+    <Author>endowdly</Author>
+    <Description>CLI TimeZone Info for .NET 6 in FSharp.</Description>
     <OutputType>Exe</OutputType>
     <TargetFramework>net6.0</TargetFramework>
   </PropertyGroup>
